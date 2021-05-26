@@ -7,6 +7,8 @@ const expressPlayground = require('graphql-playground-middleware-express').defau
 
 const typeDefs = readFileSync('./typeDefs.graphql', 'UTF-8')
 
+// 4f1d99f01481ad2671ab
+// c665216e120c6ff02e30a3c1bf7fe166f0ffbab1
 const start = async () => {
     const app = express()
 
@@ -27,7 +29,7 @@ const start = async () => {
         app.get('/playground', expressPlayground({ endpoint: '/graphql' }))
 
         app.listen({ port: 4000 },
-            () => console.log(`GraphQL server running at http://localhost:4000/${server.graphqlPath}`));
+            () => console.log(`GraphQL server running at http://localhost:4000${server.graphqlPath}`));
         console.log('closing')
     });
     // const client = await MongoClient.connect(DB_HOST,

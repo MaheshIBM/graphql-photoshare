@@ -38,6 +38,12 @@ input PostPhotoInput {
     category: PhotoCategory=PORTRAIT
     description: String
 }
+
+type AuthPayload {
+    token: String!
+    user: User!
+}
 type Mutation {
     postPhoto(input: PostPhotoInput!): Photo!
+    githubAuth(code: String!):AuthPayload!
 }
