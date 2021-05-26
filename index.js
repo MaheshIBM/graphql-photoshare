@@ -16,7 +16,12 @@ const start = async () => {
     MongoClient.connect(DB_HOST, function (err, db) {
         if (err) throw err;
         console.log("Database created!");
-        const context = { db:db.db('photoShare') }
+        const context = async ({ req }) => {
+            const githubToken = req.headers.authorization
+            const currentUser = await db.db('photoShare').collection('users')
+                .findOne({ githubToken })
+            return { db: db.db('photoShare'), currentUser }
+        }
         const server = new ApolloServer({
             typeDefs,
             resolvers,
@@ -32,11 +37,6 @@ const start = async () => {
             () => console.log(`GraphQL server running at http://localhost:4000${server.graphqlPath}`));
         console.log('closing')
     });
-    // const client = await MongoClient.connect(DB_HOST,
-    //     { useNewUrlParser: true })
-
-    // const db = client.db
-
 }
 
 start()

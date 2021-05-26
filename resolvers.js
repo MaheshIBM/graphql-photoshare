@@ -1,3 +1,4 @@
+const fetch = require('node-fetch');
 const { GraphQLScalarType } = require('graphql')
 const { users, photos, tags } = require('./users')
 const { authWithGH } = require('./githubAuthAPI')
@@ -18,14 +19,25 @@ const resolvers = {
         allUsers: (parent, args, { db }) => db.collection('users')
             .find()
             .toArray(),
+        me: (parents, args, { currentUser }) => currentUser
     },
     Mutation: {
-        postPhoto(parent, args) {
-            const newPhoto = { id: _id++, ...args.input, created: new Date() }
-            photos.push(newPhoto)
+        async postPhoto(parent, args, { db, currentUser }) {
+            console.log("Post photo called by user", currentUser)
+            if (!currentUser) {
+                throw new Error("Only an authorized user can post a photo")
+            }
+
+            const newPhoto = {
+                ...args.input,
+                created: new Date(),
+                userID: currentUser.githubLogin
+            }
+            const insertedIDs = await db.collection('photos').insert(newPhoto)
+            newPhoto.id = insertedIDs[0]
             return newPhoto
         },
-        async githubAuth(parent, {code}, { db }) {
+        async githubAuth(parent, { code }, { db }) {
             console.log('code', code)
             const {
                 message,
@@ -55,16 +67,47 @@ const resolvers = {
                 .replaceOne({ githubLogin: login }, latestUserInfo, { upsert: true })
 
             return { user, token: access_token }
+        },
+        addFakeUsers: async (root, { count }, { db }) => {
+            const randomUserAPI = `https://randomuser.me/api/?results=${count}`
+
+            const { results } = await fetch(randomUserAPI)
+                .then(res => res.json())
+
+            const users = results.map(r => ({
+                githubLogin: r.login.username,
+                name: `${r.name.first} ${r.name.last}`,
+                avatar: r.picture.thumbnail,
+                githubToken: r.login.sha1
+            }))
+
+            await db.collection('users').insert(users)
+            return users
+
+        },
+        fakeUserAuth: async(parent, { githubLogin }, {db}) => {
+            const user = await db.collection('users').findOne({githubLogin})
+            if(!user){
+                throw new Error('User not found in db')
+            }
+
+            return {
+                token: user.githubToken,
+                user
+            }
         }
     },
     Photo: {
-        url: parent => ` https://yoursite.com/img/${parent.id}.jpg`,
-        postedBy: parent => {
-            return users.find(u => u.githubLogin === parent.githubUser)
-        },
-        taggedUsers: parent => tags.filter(tag => tag.photoID === parent.id)
-            .map(tag => tag.userID)
-            .map(userID => users.find(u => userID === u.githubLogin))
+        id: parent => parent.id || parent._id,
+        url: parent => `img/photos/${parent._id}.jpg`,
+        postedBy: (parent, args, { db }) => {
+            return db.collection("users")
+                .findOne({ githubLogin: parent.userID })
+        }
+        // ,
+        // taggedUsers: parent => tags.filter(tag => tag.photoID === parent.id)
+        //     .map(tag => tag.userID)
+        //     .map(userID => users.find(u => userID === u.githubLogin))
     },
 
     User: {
